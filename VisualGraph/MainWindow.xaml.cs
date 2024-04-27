@@ -8,7 +8,17 @@ namespace VisualGraph;
 
 public partial class MainWindow 
 {
-    private readonly Graph _graph = new Graph(true);
+    private readonly Graph _graph = new Graph(false);
+
+    private readonly Dictionary<Edge, Point> _middlePoint = new Dictionary<Edge, Point>();
+    
+    private readonly Dictionary<(Vertex, Vertex), Line> _drawnLines = new Dictionary<(Vertex,Vertex), Line>();
+
+    private readonly Dictionary<Vertex, Ellipse> _drawnCircles = new Dictionary<Vertex, Ellipse>();
+    
+    private readonly Graph _minSpanningTree = new Graph(false);
+    
+    private int _index;
     
     public MainWindow()
     {
@@ -28,7 +38,7 @@ public partial class MainWindow
         
         _graph.GenerateMatrix();
         
-        DisplayMatrix(_graph);
+        DisplayMatrix(_graph.GetMatrix());
         
         var dictionary = new Dictionary<Vertex, Coordinates>();
         
@@ -41,12 +51,76 @@ public partial class MainWindow
                 DrawEdge(edge, dictionary);
             }
         }
+        
+        var weightMatrix= _graph.GenerateWeightMatrix();
+
+        var drawSpanningTree = new Button
+        {
+            Content = "draw spanning tree",
+            Width = 115,
+            Height = 50,
+        };
+
+        drawSpanningTree.Click += drawSpanningTree_Click;
+        
+        Canvas.SetLeft(drawSpanningTree, 50);
+        Canvas.SetTop(drawSpanningTree, 50);
+        
+        Canvas.Children.Add(drawSpanningTree);
+        
+        foreach (var edge in _graph.Edges)
+        {
+            if(edge.From.CurrentId != edge.To.CurrentId)
+                DrawWeight(edge);
+        }
+
+        DisplayMatrix(weightMatrix);
+
+        FindMinimumSpanningTree();
+    }
+
+    private void drawSpanningTree_Click(object sender, RoutedEventArgs e)
+    {
+        if (_index < _minSpanningTree.Edges.Count)
+        {
+            _drawnLines[(_minSpanningTree.Edges[_index].From, _minSpanningTree.Edges[_index].To)].Stroke =
+                Brushes.Fuchsia;
+            _drawnLines[(_minSpanningTree.Edges[_index].To, _minSpanningTree.Edges[_index].From)].Stroke =
+                Brushes.Fuchsia;
+            _drawnCircles[_minSpanningTree.Vertices[_index]].Fill = Brushes.Fuchsia;
+            _drawnCircles[_minSpanningTree.Vertices[_index+1]].Fill = Brushes.Fuchsia;
+            
+            _index++;
+        }
     }
     
-    private void DisplayMatrix(Graph graph)
+    private void FindMinimumSpanningTree()
     {
-        var matrix = graph.GetMatrix();
+        _minSpanningTree.AddVertex(_graph.Vertices[0]);
         
+        var lessWeightEdge = _graph.Vertices[0].Edges[0];
+
+        while (_minSpanningTree.Vertices.Count != _graph.Vertices.Count)
+        {
+            for (int i = 0; i < _minSpanningTree.Vertices.Count; i++)
+            {
+                foreach (var edge in _minSpanningTree.Vertices[i].Edges)
+                {
+                    if (lessWeightEdge.Weight > edge.Weight && !_minSpanningTree.Vertices.Contains(edge.To) && edge.Weight != 0)
+                    {
+                        lessWeightEdge = edge;
+                    }
+                }
+            }
+
+            _minSpanningTree.AddVertex(lessWeightEdge.To);
+            _minSpanningTree.AddEdge(lessWeightEdge);
+            lessWeightEdge = _graph.Vertices[0].Edges[0];
+        }
+    }
+    
+    private void DisplayMatrix<T>(T[,] matrix)
+    {
         for (int i = 0; i < matrix.GetLength(0); i++)
         {
             for (int j = 0; j < matrix.GetLength(1); j++)
@@ -84,6 +158,8 @@ public partial class MainWindow
             Stroke = Brushes.Black,
             StrokeThickness = 2
         };
+        
+        _drawnCircles.Add(vertex, ellipse);
         
         Canvas.SetLeft(ellipse, coordinates.X - 15);
         Canvas.SetTop(ellipse, coordinates.Y - 15);
@@ -173,6 +249,14 @@ public partial class MainWindow
                 StrokeThickness = 2
             };
 
+            _drawnLines.Add((edge.From, edge.To), line);
+            
+            Point startPoint = new Point(dictionary[edge.From].X + k*(dictionary[edge.To].X - dictionary[edge.From].X), dictionary[edge.From].Y + k*(dictionary[edge.To].Y - dictionary[edge.From].Y));
+            Point endPoint = new Point(dictionary[edge.To].X + k*(dictionary[edge.From].X - dictionary[edge.To].X), dictionary[edge.To].Y + k*(dictionary[edge.From].Y - dictionary[edge.To].Y));
+            Point center = new Point((startPoint.X + endPoint.X)/2, (startPoint.Y + endPoint.Y)/2);
+            
+            _middlePoint.Add(edge, center);
+            
             Canvas.Children.Add(line);
         }
 
@@ -191,7 +275,7 @@ public partial class MainWindow
             
             Polygon arrowhead = new Polygon
             {
-                Points = new PointCollection { new Point(x2, y2), new Point(x2 - 10, y2 - 5), new Point(x2 - 10, y2 + 5) }, // Треугольник
+                Points = new PointCollection { new Point(x2, y2), new Point(x2 - 10, y2 - 5), new Point(x2 - 10, y2 + 5) }, 
                 Fill = Brushes.Black, 
                 StrokeThickness = 0,
                 RenderTransform = new RotateTransform(angle, x2, y2)
@@ -199,6 +283,20 @@ public partial class MainWindow
 
             Canvas.Children.Add(arrowhead);
         }
+    }
+
+    private void DrawWeight(Edge edge)
+    {
+        var textBlock = new TextBlock
+        {
+            Text = edge.Weight.ToString(),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        Canvas.Children.Add(textBlock);
+        
+        Canvas.SetLeft(textBlock, _middlePoint[edge].X);
+        Canvas.SetTop(textBlock, _middlePoint[edge].Y);
     }
 }
 

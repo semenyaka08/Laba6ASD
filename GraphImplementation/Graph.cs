@@ -9,9 +9,9 @@ public class Graph
     
     public readonly bool IsDirected;
     
-    public List<Vertex> Vertices = new List<Vertex>();
+    public readonly List<Vertex> Vertices = new List<Vertex>();
     
-    public List<Edge> Edges = new List<Edge>();
+    public readonly List<Edge> Edges = new List<Edge>();
     
     public int[,] GetMatrix()
     {
@@ -32,6 +32,10 @@ public class Graph
         Vertex newVertex = new Vertex(value);
         Vertices.Add(newVertex);
     }
+    public void AddVertex(Vertex vertex)
+    {
+        Vertices.Add(vertex);
+    }
 
     public void AddEdge(Vertex v1, Vertex v2)
     {
@@ -50,8 +54,15 @@ public class Graph
             v2.Edges.Add(secondEdge);
         }
     }
+    public void AddEdge(Edge edge)
+    {
+        if (Edges.Any(k => k.From == edge.From && k.To == edge.To))
+            return;
+        
+        Edges.Add(edge);
+    }
 
-    private void MatrixGenerationGraph(int[,] matrix)
+    private void MatrixGenerationGraph(double[,] matrix)
     {
         for (int i = 0;i<matrix.GetLength(0);i++)
         {
@@ -65,31 +76,31 @@ public class Graph
         }
     }
 
-    private int[,] MatrixForDirected()
+    private double[,] MatrixForDirected(double k)
     {
         int variant = 3421;
         
         int n = 12; 
-        int[,] adjacencyMatrix = new int[n, n];
+        double[,] adjacencyMatrix = new double[n, n];
         Random rnd = new Random(variant);
-        
-        double k = 1.0 - 2 * 0.02 - 1 * 0.005 - 0.25;
         
         for (int i = 0; i < n; i++)
         {
             for (int j = 0; j < n; j++)
             {
-                adjacencyMatrix[i, j] = Round( (rnd.NextDouble() * 2.0) * k);
+                adjacencyMatrix[i, j] =  rnd.NextDouble() * 2.0 * k;
+                if (k != 1)
+                    adjacencyMatrix[i, j] = Round(adjacencyMatrix[i, j]);
             }
         }
-
+        
         return adjacencyMatrix;
     }
 
-    private int[,] MatrixForUnDirected(int[,] adjacencyMatrix)
+    private double[,] MatrixForUnDirected(double[,] adjacencyMatrix)
     {
         int n = 12;
-        int[,] undirectedAdjMatrix = new int[n, n]; 
+        double[,] undirectedAdjMatrix = new double[n, n]; 
 
         for (int i = 0; i < n; i++)
         {
@@ -106,12 +117,80 @@ public class Graph
         return undirectedAdjMatrix;
     }
 
+    public int[,] GenerateWeightMatrix()
+    {
+        double[,] b = MatrixForDirected(1);
+        double[,] a = MatrixForUnDirected(MatrixForDirected(1.0 - 2 * 0.01 - 1 * 0.005 - 0.05));
+        int[,] c = new int[12,12];
+        for (int i = 0;i<c.GetLength(1);i++)
+        {
+            for (int j = 0; j < c.GetLength(0); j++)
+            {
+                c[i, j] = (int)Math.Round(b[i,j] * 100 * a[i,j] );
+            }
+        }
+
+        int[,] d = new int[12, 12];
+        for (int i = 0;i<d.GetLength(0);i++)
+        {
+            for (int j = 0; j < d.GetLength(1); j++)
+            {
+                if (c[i, j] > 0)
+                    d[i, j] = 1;
+            }
+        }
+
+        int[,] h = new int[12, 12];
+        for (int i = 0;i<h.GetLength(0);i++)
+        {
+            for (int j = 0;j<h.GetLength(1);j++)
+            {
+                if (d[i, j] != d[j, i])
+                    h[i, j] = 1;
+            }
+        }
+
+        int[,] tr = new int[12, 12];
+        for (int i = 0;i<tr.GetLength(0);i++)
+        {
+            for (int j = i;j<tr.GetLength(1);j++)
+            {
+                tr[i, j] = 1;
+            }
+        }
+
+        int[,] weight = new int[12, 12];
+        for (int i = 0;i<weight.GetLength(0);i++)
+        {
+            for (int j = i, z = 0;j<weight.GetLength(1);j++)
+            {
+                weight[i, j] =  (d[i,j] + h[i,j] * tr[i, j]) * c[i, j];
+                weight[j, i] = weight[i, j];
+            }
+        }
+        
+        for (int i = 0;i<weight.GetLength(0);i++)
+        {
+            for (int j = 0;j<weight.GetLength(1);j++)
+            {
+                if (weight[i, j] != 0)
+                {
+                    Edge edge = Edges.First(p => p.From.CurrentId == i + 1 && p.To.CurrentId == j + 1);
+                    edge.Weight = weight[i, j];
+                }
+            }
+        }
+
+        return weight;
+    }
+    
     public void GenerateMatrix()
     {
-        if (IsDirected) MatrixGenerationGraph(MatrixForDirected());
-        else MatrixGenerationGraph(MatrixForUnDirected(MatrixForDirected()));
+        double k = 1.0 - 2 * 0.01 - 1 * 0.005 - 0.05;
+        if (IsDirected) MatrixGenerationGraph(MatrixForDirected(k));
+        else MatrixGenerationGraph(MatrixForUnDirected(MatrixForDirected(k)));
     }
-
+    
     static int Round(double num)
     {
         if (num < 1) return 0;

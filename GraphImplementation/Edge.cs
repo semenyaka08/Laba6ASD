@@ -7,9 +7,13 @@ public class Edge
         From = vertex1;
         To = vertex2;
     }
-    public Vertex From { get; set; }
 
-    public Vertex To { get; set; }
+    public Edge()
+    {}
+    
+    public Vertex From { get; }
 
-    public int Weight { get; set; } = 1;
+    public Vertex To { get; }
+
+    public int Weight { get; set; }
 }
